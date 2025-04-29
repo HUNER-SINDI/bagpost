@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -12,8 +13,11 @@ import (
 )
 
 func main() {
-	dsn := "postgres://postgres:Huner@212@localhost:5432/bagpost?sslmode=disable"
-
+	// dsn := "postgres://postgres:Huner@212@localhost:5432/bagpost?sslmode=disable"
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL is not set")
+	}
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("cannot connect to server: %v", err)
