@@ -156,3 +156,6 @@ LIMIT $9 OFFSET $10;
 
 -- name: CountDeliveriesById :one
 SELECT COUNT(*) FROM deliveries WHERE store_owner_id = $1;
+
+-- name: GetAllAds :many
+SELECT * FROM ads;

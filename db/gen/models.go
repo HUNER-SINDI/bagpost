@@ -8,6 +8,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Ad struct {
+	ID  int32
+	Url pgtype.Text
+}
+
 type Admin struct {
 	ID        int32
 	Email     string

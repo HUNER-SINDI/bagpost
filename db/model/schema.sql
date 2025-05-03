@@ -132,3 +132,10 @@ CREATE TABLE delivery_transfers (
     received_at TIMESTAMP NULL,
     transfer_note TEXT
 );
+
+
+
+CREATE TABLE ads (
+    id SERIAL PRIMARY KEY,
+    url VARCHAR(255)
+);

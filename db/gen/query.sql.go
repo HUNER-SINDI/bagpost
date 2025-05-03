@@ -84,6 +84,30 @@ func (q *Queries) GetAdminByEmailAndPassword(ctx context.Context, arg GetAdminBy
 	return i, err
 }
 
+const getAllAds = `-- name: GetAllAds :many
+SELECT id, url FROM ads
+`
+
+func (q *Queries) GetAllAds(ctx context.Context) ([]Ad, error) {
+	rows, err := q.db.Query(ctx, getAllAds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Ad
+	for rows.Next() {
+		var i Ad
+		if err := rows.Scan(&i.ID, &i.Url); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStoreBalanceById = `-- name: GetStoreBalanceById :one
 SELECT in_store_balance
 FROM store_balances

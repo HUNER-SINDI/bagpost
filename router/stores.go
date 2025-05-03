@@ -339,4 +339,16 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 		})
 	}, middleware.StoresAuthMiddleware)
 
+	store.Get("/ads", func(c fiber.Ctx) error {
+		response, err := q.GetAllAds(c.Context())
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		if response == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no responses"})
+		}
+		return c.JSON(response)
+
+	})
+
 }
