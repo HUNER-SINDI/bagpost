@@ -9,4 +9,6 @@ import (
 func SetupRouters(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 	RegisterWharehouseRoute(app, q, conn)
 	RegisterAdminRoute(app, q, conn)
+	RegisterStores(app, q, conn)
+
 }

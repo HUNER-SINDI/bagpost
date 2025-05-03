@@ -8,3 +8,5 @@ sql:
         package: "db"
         out: "db/gen"
         sql_package: "pgx/v5"
+    
+  

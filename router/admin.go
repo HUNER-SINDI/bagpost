@@ -2,7 +2,6 @@ package router
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
@@ -191,7 +190,6 @@ func RegisterAdminRoute(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 	}, middleware.AdminAuthMiddleware)
 
 	admin.Delete("/warehouses/:id", func(ctx fiber.Ctx) error {
-		time.Sleep(2 * time.Second)
 		// 1. Get warehouse ID from URL param
 		warehouseID, err := strconv.Atoi(ctx.Params("id"))
 		if err != nil {

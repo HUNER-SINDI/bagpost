@@ -25,21 +25,40 @@ type CityRoute struct {
 
 type Delivery struct {
 	ID                 int32
-	Barcode            pgtype.Text
-	StoreOwnerID       pgtype.Int4
-	CustomerPhone      pgtype.Text
+	Barcode            string
+	StoreOwnerID       int32
+	CustomerPhone      string
 	Note               pgtype.Text
-	FromCity           pgtype.Text
-	ToCity             pgtype.Text
-	ToSubcity          pgtype.Text
+	FromCity           string
+	ToCity             string
+	ToSubcity          string
 	ToSpecificLocation pgtype.Text
-	Status             pgtype.Text
-	CurrentLocation    pgtype.Text
-	Price              pgtype.Int4
-	FdeliveryFee       pgtype.Int4
-	TotalPrice         pgtype.Int4
-	WarehouseID        pgtype.Int4
+	Status             string
+	Price              int32
+	FdeliveryFee       int32
+	TotalPrice         int32
+	WarehouseID        int32
 	CreatedAt          pgtype.Timestamp
+}
+
+type DeliveryRouting struct {
+	ID         int32
+	DeliveryID int32
+	SetterKrd  string
+	SetterAr   string
+	CreatedAt  pgtype.Timestamp
+}
+
+type DeliveryTransfer struct {
+	ID                 int32
+	DeliveryID         int32
+	OriginWarehouseID  int32
+	CurrentWarehouseID int32
+	TransferStatus     string
+	DriverID           pgtype.Int4
+	TransferredAt      pgtype.Timestamp
+	ReceivedAt         pgtype.Timestamp
+	TransferNote       pgtype.Text
 }
 
 type Driver struct {
@@ -58,6 +77,16 @@ type Driver struct {
 	UpdatedAt       pgtype.Timestamp
 }
 
+type StoreBalance struct {
+	ID             int32
+	StoreOwnerID   pgtype.Int4
+	InStoreBalance pgtype.Int4
+	PendingBalance pgtype.Int4
+	PaidBalance    pgtype.Int4
+	RefusedBalance pgtype.Int4
+	UpdatedAt      pgtype.Timestamp
+}
+
 type StoreOwner struct {
 	ID              int32
 	FirstName       pgtype.Text
@@ -71,6 +100,12 @@ type StoreOwner struct {
 	IsActive        pgtype.Bool
 	CreatedAt       pgtype.Timestamp
 	UpdatedAt       pgtype.Timestamp
+}
+
+type Storesetter struct {
+	ID  int32
+	Krd string
+	Ar  string
 }
 
 type Subcity struct {
