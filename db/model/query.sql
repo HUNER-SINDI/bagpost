@@ -143,19 +143,27 @@ INSERT INTO delivery_transfers (
 );
 
 -- name: ListDeliveriesByStoreFiltering :many
-SELECT * FROM deliveries
-WHERE store_owner_id = $1
-  AND (COALESCE($2, '') = '' OR status = $2)
-  AND (COALESCE($3, '') = '' OR barcode ILIKE '%' || $3 || '%')
-  AND (COALESCE($4, '') = '' OR customer_phone ILIKE '%' || $4 || '%')
-  AND (COALESCE($5, '') = '' OR to_city ILIKE '%' || $5 || '%')
-  AND (COALESCE($6, '') = '' OR to_subcity ILIKE '%' || $6 || '%')
-  AND (COALESCE($7, 0) = 0 OR price >= $7)
+SELECT * FROM deliveries WHERE store_owner_id = $1 
+  AND (COALESCE($2, '') = '' OR status = $2) 
+  AND (COALESCE($3, '') = '' OR barcode ILIKE '%' || $3 || '%') 
+  AND (COALESCE($4, '') = '' OR customer_phone ILIKE '%' || $4 || '%') 
+  AND (COALESCE($5, '') = '' OR to_city ILIKE '%' || $5 || '%') 
+  AND (COALESCE($6, '') = '' OR to_subcity ILIKE '%' || $6 || '%') 
+  AND (COALESCE($7, 0) = 0 OR price >= $7) 
   AND (COALESCE($8, 0) = 0 OR price <= $8)
 LIMIT $9 OFFSET $10;
 
+-- name: GetDeliveryRoutes :many
+SELECT * FROM delivery_routing WHERE delivery_id = $1 ORDER BY created_at ASC;
 -- name: CountDeliveriesById :one
 SELECT COUNT(*) FROM deliveries WHERE store_owner_id = $1;
 
 -- name: GetAllAds :many
 SELECT * FROM ads;
+
+-- name: GetDeliveryStatusByStoreId :many
+SELECT status, COUNT(*) as count
+FROM deliveries
+WHERE store_owner_id = $1
+GROUP BY status;
+

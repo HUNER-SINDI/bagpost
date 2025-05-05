@@ -108,6 +108,68 @@ func (q *Queries) GetAllAds(ctx context.Context) ([]Ad, error) {
 	return items, nil
 }
 
+const getDeliveryRoutes = `-- name: GetDeliveryRoutes :many
+SELECT id, delivery_id, setter_krd, setter_ar, created_at FROM delivery_routing WHERE delivery_id = $1 ORDER BY created_at ASC
+`
+
+func (q *Queries) GetDeliveryRoutes(ctx context.Context, deliveryID int32) ([]DeliveryRouting, error) {
+	rows, err := q.db.Query(ctx, getDeliveryRoutes, deliveryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DeliveryRouting
+	for rows.Next() {
+		var i DeliveryRouting
+		if err := rows.Scan(
+			&i.ID,
+			&i.DeliveryID,
+			&i.SetterKrd,
+			&i.SetterAr,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDeliveryStatusByStoreId = `-- name: GetDeliveryStatusByStoreId :many
+SELECT status, COUNT(*) as count
+FROM deliveries
+WHERE store_owner_id = $1
+GROUP BY status
+`
+
+type GetDeliveryStatusByStoreIdRow struct {
+	Status string
+	Count  int64
+}
+
+func (q *Queries) GetDeliveryStatusByStoreId(ctx context.Context, storeOwnerID int32) ([]GetDeliveryStatusByStoreIdRow, error) {
+	rows, err := q.db.Query(ctx, getDeliveryStatusByStoreId, storeOwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDeliveryStatusByStoreIdRow
+	for rows.Next() {
+		var i GetDeliveryStatusByStoreIdRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getStoreBalanceById = `-- name: GetStoreBalanceById :one
 SELECT in_store_balance
 FROM store_balances
@@ -408,14 +470,13 @@ func (q *Queries) InsertWharehouses(ctx context.Context, arg InsertWharehousesPa
 }
 
 const listDeliveriesByStoreFiltering = `-- name: ListDeliveriesByStoreFiltering :many
-SELECT id, barcode, store_owner_id, customer_phone, note, from_city, to_city, to_subcity, to_specific_location, status, price, fdelivery_fee, total_price, warehouse_id, created_at FROM deliveries
-WHERE store_owner_id = $1
-  AND (COALESCE($2, '') = '' OR status = $2)
-  AND (COALESCE($3, '') = '' OR barcode ILIKE '%' || $3 || '%')
-  AND (COALESCE($4, '') = '' OR customer_phone ILIKE '%' || $4 || '%')
-  AND (COALESCE($5, '') = '' OR to_city ILIKE '%' || $5 || '%')
-  AND (COALESCE($6, '') = '' OR to_subcity ILIKE '%' || $6 || '%')
-  AND (COALESCE($7, 0) = 0 OR price >= $7)
+SELECT id, barcode, store_owner_id, customer_phone, note, from_city, to_city, to_subcity, to_specific_location, status, price, fdelivery_fee, total_price, warehouse_id, created_at FROM deliveries WHERE store_owner_id = $1 
+  AND (COALESCE($2, '') = '' OR status = $2) 
+  AND (COALESCE($3, '') = '' OR barcode ILIKE '%' || $3 || '%') 
+  AND (COALESCE($4, '') = '' OR customer_phone ILIKE '%' || $4 || '%') 
+  AND (COALESCE($5, '') = '' OR to_city ILIKE '%' || $5 || '%') 
+  AND (COALESCE($6, '') = '' OR to_subcity ILIKE '%' || $6 || '%') 
+  AND (COALESCE($7, 0) = 0 OR price >= $7) 
   AND (COALESCE($8, 0) = 0 OR price <= $8)
 LIMIT $9 OFFSET $10
 `

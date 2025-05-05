@@ -2,7 +2,9 @@ package router
 
 import (
 	"fmt"
+	"log"
 	"strconv"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5"
@@ -280,7 +282,7 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 		offset, _ := strconv.Atoi(c.Query("offset", "0"))
 
 		// Execute the SQL query with the dynamic filters
-		response, err := q.ListDeliveriesByStoreFiltering(c.Context(), db.ListDeliveriesByStoreFilteringParams{
+		deliveries, err := q.ListDeliveriesByStoreFiltering(c.Context(), db.ListDeliveriesByStoreFilteringParams{
 			StoreOwnerID: int32(storeID),
 			Column2:      status,
 			Column3:      barcode,
@@ -303,8 +305,55 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
 
-		if response == nil {
+		if deliveries == nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Not Found"})
+		}
+
+		// Create a response structure that includes routes
+		type RouteResponse struct {
+			ID        int32     `json:"id"`
+			SetterKrd string    `json:"setter_krd"`
+			SetterAr  string    `json:"setter_ar"`
+			CreatedAt time.Time `json:"created_at"`
+		}
+
+		type DeliveryWithRoutes struct {
+			db.Delivery
+			Routes []RouteResponse `json:"routes"`
+		}
+
+		// Fetch routes for each delivery and build response
+		var response []DeliveryWithRoutes
+		for _, delivery := range deliveries {
+			// Fetch routes for this delivery
+			routes, err := q.GetDeliveryRoutes(c.Context(), delivery.ID)
+			if err != nil {
+				// Log error but continue
+				log.Printf("Error fetching routes for delivery %d: %v", delivery.ID, err)
+				// Add delivery without routes
+				response = append(response, DeliveryWithRoutes{
+					Delivery: delivery,
+					Routes:   []RouteResponse{},
+				})
+				continue
+			}
+
+			// Convert routes to response format
+			routesResponse := make([]RouteResponse, len(routes))
+			for i, route := range routes {
+				routesResponse[i] = RouteResponse{
+					ID:        route.ID,
+					SetterKrd: route.SetterKrd,
+					SetterAr:  route.SetterAr,
+					CreatedAt: route.CreatedAt.Time,
+				}
+			}
+
+			// Add delivery with routes to response
+			response = append(response, DeliveryWithRoutes{
+				Delivery: delivery,
+				Routes:   routesResponse,
+			})
 		}
 
 		// Cast limit and offset to int64 to match the type of totalDeliveries (int64)
@@ -350,5 +399,22 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 		return c.JSON(response)
 
 	})
+	store.Get("/status", func(c fiber.Ctx) error {
+		storeIDRaw := c.Locals("store_id")
+		storeID, ok := storeIDRaw.(int)
+		if !ok {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Invalid store ID in context"})
+		}
+
+		response, err := q.GetDeliveryStatusByStoreId(c.Context(), int32(storeID))
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		if response == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no responses"})
+		}
+		return c.JSON(response)
+
+	}, middleware.StoresAuthMiddleware)
 
 }
