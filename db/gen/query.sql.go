@@ -108,6 +108,65 @@ func (q *Queries) GetAllAds(ctx context.Context) ([]Ad, error) {
 	return items, nil
 }
 
+const getAllRoutesByWarehouseId = `-- name: GetAllRoutesByWarehouseId :many
+SELECT 
+  cr.id,
+  cr.city_name_en,
+  cr.city_name_ar,
+  cr.city_name_ku,
+  COALESCE(
+    (
+      SELECT json_agg(
+        json_build_object(
+          'id', sc.id,
+          'subcity_name_en', sc.subcity_name_en,
+          'subcity_name_ar', sc.subcity_name_ar,
+          'subcity_name_ku', sc.subcity_name_ku,
+          'price', sc.price
+        )
+      )
+      FROM subcities sc
+      WHERE sc.city_route_id = cr.id
+    ), '[]'
+  ) AS subcities
+FROM city_routes cr WHERE cr.warehouse_id = $1
+ORDER BY cr.id
+`
+
+type GetAllRoutesByWarehouseIdRow struct {
+	ID         int32
+	CityNameEn pgtype.Text
+	CityNameAr pgtype.Text
+	CityNameKu pgtype.Text
+	Subcities  interface{}
+}
+
+func (q *Queries) GetAllRoutesByWarehouseId(ctx context.Context, warehouseID pgtype.Int4) ([]GetAllRoutesByWarehouseIdRow, error) {
+	rows, err := q.db.Query(ctx, getAllRoutesByWarehouseId, warehouseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllRoutesByWarehouseIdRow
+	for rows.Next() {
+		var i GetAllRoutesByWarehouseIdRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CityNameEn,
+			&i.CityNameAr,
+			&i.CityNameKu,
+			&i.Subcities,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDeliveryRoutes = `-- name: GetDeliveryRoutes :many
 SELECT id, delivery_id, setter_krd, setter_ar, created_at FROM delivery_routing WHERE delivery_id = $1 ORDER BY created_at ASC
 `
@@ -316,6 +375,17 @@ func (q *Queries) GetWarehouseByID(ctx context.Context, id int32) (GetWarehouseB
 		&i.IsActive,
 	)
 	return i, err
+}
+
+const getWarehouseIdByStoreId = `-- name: GetWarehouseIdByStoreId :one
+SELECT warehouse_id FROM store_owners WHERE id = $1
+`
+
+func (q *Queries) GetWarehouseIdByStoreId(ctx context.Context, id int32) (pgtype.Int4, error) {
+	row := q.db.QueryRow(ctx, getWarehouseIdByStoreId, id)
+	var warehouse_id pgtype.Int4
+	err := row.Scan(&warehouse_id)
+	return warehouse_id, err
 }
 
 const insertDeliveryRouting = `-- name: InsertDeliveryRouting :exec

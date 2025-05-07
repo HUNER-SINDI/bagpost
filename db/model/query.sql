@@ -167,3 +167,32 @@ FROM deliveries
 WHERE store_owner_id = $1
 GROUP BY status;
 
+-- name: GetAllRoutesByWarehouseId :many
+SELECT 
+  cr.id,
+  cr.city_name_en,
+  cr.city_name_ar,
+  cr.city_name_ku,
+  COALESCE(
+    (
+      SELECT json_agg(
+        json_build_object(
+          'id', sc.id,
+          'subcity_name_en', sc.subcity_name_en,
+          'subcity_name_ar', sc.subcity_name_ar,
+          'subcity_name_ku', sc.subcity_name_ku,
+          'price', sc.price
+        )
+      )
+      FROM subcities sc
+      WHERE sc.city_route_id = cr.id
+    ), '[]'
+  ) AS subcities
+FROM city_routes cr WHERE cr.warehouse_id = $1
+ORDER BY cr.id ;
+
+
+-- name: GetWarehouseIdByStoreId :one 
+SELECT warehouse_id FROM store_owners WHERE id = $1;
+
+

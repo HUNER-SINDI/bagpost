@@ -24,8 +24,9 @@ type Admin struct {
 type CityRoute struct {
 	ID          int32
 	WarehouseID pgtype.Int4
-	CityName    pgtype.Text
-	Price       int32
+	CityNameEn  pgtype.Text
+	CityNameAr  pgtype.Text
+	CityNameKu  pgtype.Text
 }
 
 type Delivery struct {
@@ -114,10 +115,12 @@ type Storesetter struct {
 }
 
 type Subcity struct {
-	ID          int32
-	CityRouteID pgtype.Int4
-	SubcityName pgtype.Text
-	Price       pgtype.Int4
+	ID            int32
+	CityRouteID   pgtype.Int4
+	SubcityNameEn pgtype.Text
+	SubcityNameAr pgtype.Text
+	SubcityNameKu pgtype.Text
+	Price         pgtype.Int4
 }
 
 type Warehouse struct {

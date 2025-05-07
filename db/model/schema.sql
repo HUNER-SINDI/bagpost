@@ -83,14 +83,18 @@ CREATE TABLE drivers (
 CREATE TABLE city_routes (
     id SERIAL PRIMARY KEY,
     warehouse_id INTEGER REFERENCES warehouses(id),
-    city_name VARCHAR(100),
-    price INTEGER NOT NULL
+    city_name_en VARCHAR(100),
+    city_name_ar VARCHAR(100),
+    city_name_ku VARCHAR(100)
 );
+
 
 CREATE TABLE subcities (
     id SERIAL PRIMARY KEY,
     city_route_id INTEGER REFERENCES city_routes(id),
-    subcity_name VARCHAR(100),
+    subcity_name_en VARCHAR(100),
+    subcity_name_ar VARCHAR(100),
+    subcity_name_ku VARCHAR(100),
     price INTEGER
 );
 

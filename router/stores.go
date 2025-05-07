@@ -417,4 +417,25 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 
 	}, middleware.StoresAuthMiddleware)
 
+	store.Get("/routes", func(c fiber.Ctx) error {
+		storeIDRaw := c.Locals("store_id")
+		storeID, ok := storeIDRaw.(int)
+		if !ok {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Invalid store ID in context"})
+		}
+
+		// get warehouse id
+		warehouseId, err := q.GetWarehouseIdByStoreId(c.Context(), int32(storeID))
+		if err != nil {
+			return c.Status(fiber.StatusNoContent).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		res, err := q.GetAllRoutesByWarehouseId(c.Context(), warehouseId)
+		if err != nil {
+			return c.Status(fiber.StatusNoContent).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		return c.JSON(res)
+	}, middleware.StoresAuthMiddleware)
+
 }
