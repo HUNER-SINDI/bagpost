@@ -6,14 +6,19 @@ type StoreLoginInput struct {
 }
 
 type DeliveriesInsert struct {
-	Barcode            string `json:"barcode" validate:"required"`
-	CustomerPhone      string `json:"customer_phone" validate:"required"`
-	Note               string `json:"note"`
-	FromCity           string `json:"from_city" validate:"required"`
-	ToCity             string `json:"to_city" validate:"required"`
-	ToSubCity          string `json:"to_subcity" validate:"required"`
-	ToSpecificLocation string `json:"to_specific_location" validate:"required"`
-	Status             string `json:"status"`
+	Barcode       string `json:"barcode" validate:"required"`
+	CustomerPhone string `json:"customer_phone" validate:"required"`
+	Note          string `json:"note"`
+
+	ToCityKu string `json:"to_city_ku" validate:"required"`
+	ToCityEn string `json:"to_city_en" validate:"required"`
+	ToCityAr string `json:"to_city_ar" validate:"required"`
+
+	ToSubCityKu string `json:"to_subcity_ku" validate:"required"`
+	ToSubCityEn string `json:"to_subcity_en" validate:"required"`
+	ToSubCityAr string `json:"to_subcity_ar" validate:"required"`
+
+	ToSpecificLocation string `json:"to_specific_location"`
 	Price              int32  `json:"price" validate:"gte=0"`
 	Fee                int32  `json:"fdelivery_fee" validate:"required"`
 	Total              int32  `json:"total_price" validate:"required"`

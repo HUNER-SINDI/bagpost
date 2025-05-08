@@ -83,7 +83,8 @@ func RegisterAdminRoute(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 
 		// Insert warehouse setter
 		setterParams := db.InsertWarehouseSetterParams{
-			Krd:         input.Krd,
+			Ku:          input.Ku,
+			En:          input.En,
 			Ar:          input.Ar,
 			WarehouseID: warehouseID,
 		}
@@ -169,7 +170,8 @@ func RegisterAdminRoute(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 
 		// 6. Update warehouse setter
 		setterParams := db.UpdateWarehouseSetterParams{
-			Krd:         input.Krd,
+			Ku:          input.Ku,
+			En:          input.En,
 			Ar:          input.Ar,
 			WarehouseID: int32(warehouseID),
 		}

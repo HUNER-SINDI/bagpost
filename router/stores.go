@@ -185,17 +185,30 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get store profile"})
 		}
 
+		// get Store City
+		fromCity, err := qtx.GetFromCityByStoreId(c.Context(), int32(storeID))
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get store Store Cities"})
+		}
+
 		// 3.2 - Insert new delivery and get ID
 		deliveryID, err := qtx.InsertDeliveryStore(c.Context(), db.InsertDeliveryStoreParams{
 			Barcode:            input.Barcode,
 			StoreOwnerID:       int32(storeID),
 			CustomerPhone:      input.CustomerPhone,
 			Note:               pgtype.Text{String: input.Note, Valid: input.Note != ""},
-			FromCity:           input.FromCity,
-			ToCity:             input.ToCity,
-			ToSubcity:          input.ToSubCity,
+			FromCityKu:         fromCity.CityKu.String,
+			FromCityEn:         fromCity.CityEn.String,
+			FromCityAr:         fromCity.CityAr.String,
+			ToCityKu:           input.ToCityKu,
+			ToCityEn:           input.ToCityEn,
+			ToCityAr:           input.ToCityAr,
+			ToSubcityKu:        input.ToSubCityKu,
+			ToSubcityEn:        input.ToSubCityEn,
+			ToSubcityAr:        input.ToSubCityAr,
 			ToSpecificLocation: pgtype.Text{String: input.ToSpecificLocation, Valid: input.ToSpecificLocation != ""},
-			Status:             "pending",
+			Status:             "in_store",
 			Price:              input.Price,
 			FdeliveryFee:       input.Fee,
 			TotalPrice:         input.Total,
@@ -214,8 +227,9 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 		// 3.4 - Insert delivery routing
 		err = qtx.InsertDeliveryRouting(c.Context(), db.InsertDeliveryRoutingParams{
 			DeliveryID: deliveryID,
-			SetterKrd:  setter.Krd,
+			SetterKu:   setter.Ku,
 			SetterAr:   setter.Ar,
+			SetterEn:   setter.En,
 		})
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to insert delivery routing"})
@@ -306,14 +320,18 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 		}
 
 		if deliveries == nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Not Found"})
+			return c.JSON(fiber.Map{"data": []interface{}{}})
+
 		}
 
 		// Create a response structure that includes routes
 		type RouteResponse struct {
-			ID        int32     `json:"id"`
-			SetterKrd string    `json:"setter_krd"`
-			SetterAr  string    `json:"setter_ar"`
+			ID       int32  `json:"id"`
+			SetterKu string `json:"setter_ku"`
+
+			SetterAr string `json:"setter_ar"`
+			SetterEn string `json:"setter_en"`
+
 			CreatedAt time.Time `json:"created_at"`
 		}
 
@@ -343,8 +361,9 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 			for i, route := range routes {
 				routesResponse[i] = RouteResponse{
 					ID:        route.ID,
-					SetterKrd: route.SetterKrd,
+					SetterKu:  route.SetterKu,
 					SetterAr:  route.SetterAr,
+					SetterEn:  route.SetterEn,
 					CreatedAt: route.CreatedAt.Time,
 				}
 			}
@@ -406,14 +425,25 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Invalid store ID in context"})
 		}
 
-		response, err := q.GetDeliveryStatusByStoreId(c.Context(), int32(storeID))
+		// Query: Get grouped counts by status
+		statusCounts, err := q.GetDeliveryStatusByStoreId(c.Context(), int32(storeID))
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		if response == nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "no responses"})
+
+		// Query: Get total count
+		totalCount, err := q.CountDeliveriesById(c.Context(), int32(storeID))
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 		}
-		return c.JSON(response)
+
+		// Append total row
+		statusCounts = append(statusCounts, db.GetDeliveryStatusByStoreIdRow{
+			Status: "total",
+			Count:  totalCount,
+		})
+
+		return c.JSON(statusCounts)
 
 	}, middleware.StoresAuthMiddleware)
 
@@ -433,6 +463,22 @@ func RegisterStores(app *fiber.App, q *db.Queries, conn *pgxpool.Pool) {
 		res, err := q.GetAllRoutesByWarehouseId(c.Context(), warehouseId)
 		if err != nil {
 			return c.Status(fiber.StatusNoContent).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		return c.JSON(res)
+	}, middleware.StoresAuthMiddleware)
+
+	store.Get("/balance", func(c fiber.Ctx) error {
+		storeIDRaw := c.Locals("store_id")
+		storeID, ok := storeIDRaw.(int)
+		if !ok {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Invalid store ID in context"})
+		}
+
+		res, err := q.GetAllStoreBalanceById(c.Context(), int32(storeID))
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "cant fetch balance!"})
 		}
 
 		return c.JSON(res)

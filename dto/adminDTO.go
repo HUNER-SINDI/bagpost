@@ -7,8 +7,9 @@ type CreateWarehouseInput struct {
 	Password string `json:"password" validate:"required"`
 	Phone    string `json:"phone" validate:"required"`
 	IsActive bool   `json:"is_active"`
-	Krd      string `json:"krd" validate:"required"`
+	Ku       string `json:"ku" validate:"required"`
 	Ar       string `json:"ar" validate:"required"`
+	En       string `json:"en" validate:"required"`
 }
 
 type UpdateWarehouseInput struct {
@@ -17,6 +18,7 @@ type UpdateWarehouseInput struct {
 	Email    string `json:"email" validate:"required,email"`
 	Phone    string `json:"phone" validate:"required"`
 	IsActive bool   `json:"is_active" validate:"required"`
-	Krd      string `json:"krd" validate:"required"`
+	Ku       string `json:"ku" validate:"required"`
 	Ar       string `json:"ar" validate:"required"`
+	En       string `json:"en" validate:"required"`
 }

@@ -35,9 +35,15 @@ type Delivery struct {
 	StoreOwnerID       int32
 	CustomerPhone      string
 	Note               pgtype.Text
-	FromCity           string
-	ToCity             string
-	ToSubcity          string
+	FromCityKu         string
+	FromCityEn         string
+	FromCityAr         string
+	ToCityKu           string
+	ToCityEn           string
+	ToCityAr           string
+	ToSubcityKu        string
+	ToSubcityEn        string
+	ToSubcityAr        string
 	ToSpecificLocation pgtype.Text
 	Status             string
 	Price              int32
@@ -50,7 +56,8 @@ type Delivery struct {
 type DeliveryRouting struct {
 	ID         int32
 	DeliveryID int32
-	SetterKrd  string
+	SetterKu   string
+	SetterEn   string
 	SetterAr   string
 	CreatedAt  pgtype.Timestamp
 }
@@ -100,7 +107,9 @@ type StoreOwner struct {
 	Phone           pgtype.Text
 	Email           pgtype.Text
 	Password        pgtype.Text
-	LocationCity    pgtype.Text
+	CityKu          pgtype.Text
+	CityEn          pgtype.Text
+	CityAr          pgtype.Text
 	LocationAddress pgtype.Text
 	WarehouseID     pgtype.Int4
 	IsActive        pgtype.Bool
@@ -109,9 +118,10 @@ type StoreOwner struct {
 }
 
 type Storesetter struct {
-	ID  int32
-	Krd string
-	Ar  string
+	ID int32
+	Ku string
+	Ar string
+	En string
 }
 
 type Subcity struct {
@@ -137,7 +147,8 @@ type Warehouse struct {
 
 type Warehousesetter struct {
 	ID          int32
-	Krd         string
+	Ku          string
 	Ar          string
+	En          string
 	WarehouseID int32
 }

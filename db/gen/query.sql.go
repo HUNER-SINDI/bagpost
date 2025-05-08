@@ -167,8 +167,27 @@ func (q *Queries) GetAllRoutesByWarehouseId(ctx context.Context, warehouseID pgt
 	return items, nil
 }
 
+const getAllStoreBalanceById = `-- name: GetAllStoreBalanceById :one
+SELECT id, store_owner_id, in_store_balance, pending_balance, paid_balance, refused_balance, updated_at FROM store_balances WHERE id = $1
+`
+
+func (q *Queries) GetAllStoreBalanceById(ctx context.Context, id int32) (StoreBalance, error) {
+	row := q.db.QueryRow(ctx, getAllStoreBalanceById, id)
+	var i StoreBalance
+	err := row.Scan(
+		&i.ID,
+		&i.StoreOwnerID,
+		&i.InStoreBalance,
+		&i.PendingBalance,
+		&i.PaidBalance,
+		&i.RefusedBalance,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getDeliveryRoutes = `-- name: GetDeliveryRoutes :many
-SELECT id, delivery_id, setter_krd, setter_ar, created_at FROM delivery_routing WHERE delivery_id = $1 ORDER BY created_at ASC
+SELECT id, delivery_id, setter_ku, setter_en, setter_ar, created_at FROM delivery_routing WHERE delivery_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) GetDeliveryRoutes(ctx context.Context, deliveryID int32) ([]DeliveryRouting, error) {
@@ -183,7 +202,8 @@ func (q *Queries) GetDeliveryRoutes(ctx context.Context, deliveryID int32) ([]De
 		if err := rows.Scan(
 			&i.ID,
 			&i.DeliveryID,
-			&i.SetterKrd,
+			&i.SetterKu,
+			&i.SetterEn,
 			&i.SetterAr,
 			&i.CreatedAt,
 		); err != nil {
@@ -227,6 +247,23 @@ func (q *Queries) GetDeliveryStatusByStoreId(ctx context.Context, storeOwnerID i
 		return nil, err
 	}
 	return items, nil
+}
+
+const getFromCityByStoreId = `-- name: GetFromCityByStoreId :one
+SELECT city_ku , city_en , city_ar FROM store_owners WHERE id = $1
+`
+
+type GetFromCityByStoreIdRow struct {
+	CityKu pgtype.Text
+	CityEn pgtype.Text
+	CityAr pgtype.Text
+}
+
+func (q *Queries) GetFromCityByStoreId(ctx context.Context, id int32) (GetFromCityByStoreIdRow, error) {
+	row := q.db.QueryRow(ctx, getFromCityByStoreId, id)
+	var i GetFromCityByStoreIdRow
+	err := row.Scan(&i.CityKu, &i.CityEn, &i.CityAr)
+	return i, err
 }
 
 const getStoreBalanceById = `-- name: GetStoreBalanceById :one
@@ -292,7 +329,7 @@ func (q *Queries) GetStoreOwnerByEmail(ctx context.Context, email pgtype.Text) (
 }
 
 const getStoreProfileById = `-- name: GetStoreProfileById :one
-SELECT id, first_name, last_name, phone, email, password, location_city, location_address, warehouse_id, is_active, created_at, updated_at FROM store_owners WHERE id = $1
+SELECT id, first_name, last_name, phone, email, password, city_ku, city_en, city_ar, location_address, warehouse_id, is_active, created_at, updated_at FROM store_owners WHERE id = $1
 `
 
 func (q *Queries) GetStoreProfileById(ctx context.Context, id int32) (StoreOwner, error) {
@@ -305,7 +342,9 @@ func (q *Queries) GetStoreProfileById(ctx context.Context, id int32) (StoreOwner
 		&i.Phone,
 		&i.Email,
 		&i.Password,
-		&i.LocationCity,
+		&i.CityKu,
+		&i.CityEn,
+		&i.CityAr,
 		&i.LocationAddress,
 		&i.WarehouseID,
 		&i.IsActive,
@@ -316,18 +355,19 @@ func (q *Queries) GetStoreProfileById(ctx context.Context, id int32) (StoreOwner
 }
 
 const getStoreSetter = `-- name: GetStoreSetter :one
-SELECT krd, ar FROM storesetter LIMIT 1
+SELECT ku ,en, ar FROM storesetter LIMIT 1
 `
 
 type GetStoreSetterRow struct {
-	Krd string
-	Ar  string
+	Ku string
+	En string
+	Ar string
 }
 
 func (q *Queries) GetStoreSetter(ctx context.Context) (GetStoreSetterRow, error) {
 	row := q.db.QueryRow(ctx, getStoreSetter)
 	var i GetStoreSetterRow
-	err := row.Scan(&i.Krd, &i.Ar)
+	err := row.Scan(&i.Ku, &i.En, &i.Ar)
 	return i, err
 }
 
@@ -391,21 +431,28 @@ func (q *Queries) GetWarehouseIdByStoreId(ctx context.Context, id int32) (pgtype
 const insertDeliveryRouting = `-- name: InsertDeliveryRouting :exec
 INSERT INTO delivery_routing (
   delivery_id,
-  setter_krd,
-  setter_ar
+  setter_ku,
+  setter_ar,
+  setter_en
 ) VALUES (
-  $1, $2, $3
+  $1, $2, $3 , $4
 )
 `
 
 type InsertDeliveryRoutingParams struct {
 	DeliveryID int32
-	SetterKrd  string
+	SetterKu   string
 	SetterAr   string
+	SetterEn   string
 }
 
 func (q *Queries) InsertDeliveryRouting(ctx context.Context, arg InsertDeliveryRoutingParams) error {
-	_, err := q.db.Exec(ctx, insertDeliveryRouting, arg.DeliveryID, arg.SetterKrd, arg.SetterAr)
+	_, err := q.db.Exec(ctx, insertDeliveryRouting,
+		arg.DeliveryID,
+		arg.SetterKu,
+		arg.SetterAr,
+		arg.SetterEn,
+	)
 	return err
 }
 
@@ -415,18 +462,33 @@ INSERT INTO deliveries (
   store_owner_id,
   customer_phone,
   note,
-  from_city,
-  to_city,
-  to_subcity,
+
+  from_city_ku,
+  from_city_en,
+  from_city_ar,
+
+  to_city_ku,
+  to_city_en,
+  to_city_ar,
+
+  to_subcity_ku,
+  to_subcity_en,
+  to_subcity_ar,
+
   to_specific_location,
+
   status,
   price,
   fdelivery_fee,
   total_price,
   warehouse_id
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8,
-  $9, $10, $11, $12, $13
+  $1,  $2,  $3,  $4,
+  $5,  $6,  $7,
+  $8,  $9,  $10,
+  $11, $12, $13,
+  $14,
+  $15, $16, $17, $18, $19
 )
 RETURNING id
 `
@@ -436,9 +498,15 @@ type InsertDeliveryStoreParams struct {
 	StoreOwnerID       int32
 	CustomerPhone      string
 	Note               pgtype.Text
-	FromCity           string
-	ToCity             string
-	ToSubcity          string
+	FromCityKu         string
+	FromCityEn         string
+	FromCityAr         string
+	ToCityKu           string
+	ToCityEn           string
+	ToCityAr           string
+	ToSubcityKu        string
+	ToSubcityEn        string
+	ToSubcityAr        string
 	ToSpecificLocation pgtype.Text
 	Status             string
 	Price              int32
@@ -453,9 +521,15 @@ func (q *Queries) InsertDeliveryStore(ctx context.Context, arg InsertDeliverySto
 		arg.StoreOwnerID,
 		arg.CustomerPhone,
 		arg.Note,
-		arg.FromCity,
-		arg.ToCity,
-		arg.ToSubcity,
+		arg.FromCityKu,
+		arg.FromCityEn,
+		arg.FromCityAr,
+		arg.ToCityKu,
+		arg.ToCityEn,
+		arg.ToCityAr,
+		arg.ToSubcityKu,
+		arg.ToSubcityEn,
+		arg.ToSubcityAr,
 		arg.ToSpecificLocation,
 		arg.Status,
 		arg.Price,
@@ -477,7 +551,7 @@ INSERT INTO delivery_transfers (
   driver_id,
   transfer_note
 ) VALUES (
-  $1, $2, $3, 'pending', NULL, NULL
+  $1, $2, $3, 'in_store', NULL, NULL
 )
 `
 
@@ -493,19 +567,25 @@ func (q *Queries) InsertDeliveryTransfer(ctx context.Context, arg InsertDelivery
 }
 
 const insertWarehouseSetter = `-- name: InsertWarehouseSetter :one
-INSERT INTO warehousesetter (krd, ar, warehouse_id)
-VALUES ($1, $2, $3)
+INSERT INTO warehousesetter (ku, ar , en, warehouse_id)
+VALUES ($1, $2, $3 , $4)
 RETURNING id
 `
 
 type InsertWarehouseSetterParams struct {
-	Krd         string
+	Ku          string
 	Ar          string
+	En          string
 	WarehouseID int32
 }
 
 func (q *Queries) InsertWarehouseSetter(ctx context.Context, arg InsertWarehouseSetterParams) (int32, error) {
-	row := q.db.QueryRow(ctx, insertWarehouseSetter, arg.Krd, arg.Ar, arg.WarehouseID)
+	row := q.db.QueryRow(ctx, insertWarehouseSetter,
+		arg.Ku,
+		arg.Ar,
+		arg.En,
+		arg.WarehouseID,
+	)
 	var id int32
 	err := row.Scan(&id)
 	return id, err
@@ -540,13 +620,24 @@ func (q *Queries) InsertWharehouses(ctx context.Context, arg InsertWharehousesPa
 }
 
 const listDeliveriesByStoreFiltering = `-- name: ListDeliveriesByStoreFiltering :many
-SELECT id, barcode, store_owner_id, customer_phone, note, from_city, to_city, to_subcity, to_specific_location, status, price, fdelivery_fee, total_price, warehouse_id, created_at FROM deliveries WHERE store_owner_id = $1 
-  AND (COALESCE($2, '') = '' OR status = $2) 
-  AND (COALESCE($3, '') = '' OR barcode ILIKE '%' || $3 || '%') 
-  AND (COALESCE($4, '') = '' OR customer_phone ILIKE '%' || $4 || '%') 
-  AND (COALESCE($5, '') = '' OR to_city ILIKE '%' || $5 || '%') 
-  AND (COALESCE($6, '') = '' OR to_subcity ILIKE '%' || $6 || '%') 
-  AND (COALESCE($7, 0) = 0 OR price >= $7) 
+SELECT id, barcode, store_owner_id, customer_phone, note, from_city_ku, from_city_en, from_city_ar, to_city_ku, to_city_en, to_city_ar, to_subcity_ku, to_subcity_en, to_subcity_ar, to_specific_location, status, price, fdelivery_fee, total_price, warehouse_id, created_at FROM deliveries
+WHERE store_owner_id = $1
+  AND (COALESCE($2, '') = '' OR status = $2)
+  AND (COALESCE($3, '') = '' OR barcode ILIKE '%' || $3 || '%')
+  AND (COALESCE($4, '') = '' OR customer_phone ILIKE '%' || $4 || '%')
+  AND (
+    COALESCE($5, '') = '' OR
+    to_city_en ILIKE '%' || $5 || '%' OR
+    to_city_ar ILIKE '%' || $5 || '%' OR
+    to_city_ku ILIKE '%' || $5 || '%'
+  )
+  AND (
+    COALESCE($6, '') = '' OR
+    to_subcity_en ILIKE '%' || $6 || '%' OR
+    to_subcity_ar ILIKE '%' || $6 || '%' OR
+    to_subcity_ku ILIKE '%' || $6 || '%'
+  )
+  AND (COALESCE($7, 0) = 0 OR price >= $7)
   AND (COALESCE($8, 0) = 0 OR price <= $8)
 LIMIT $9 OFFSET $10
 `
@@ -590,9 +681,15 @@ func (q *Queries) ListDeliveriesByStoreFiltering(ctx context.Context, arg ListDe
 			&i.StoreOwnerID,
 			&i.CustomerPhone,
 			&i.Note,
-			&i.FromCity,
-			&i.ToCity,
-			&i.ToSubcity,
+			&i.FromCityKu,
+			&i.FromCityEn,
+			&i.FromCityAr,
+			&i.ToCityKu,
+			&i.ToCityEn,
+			&i.ToCityAr,
+			&i.ToSubcityKu,
+			&i.ToSubcityEn,
+			&i.ToSubcityAr,
 			&i.ToSpecificLocation,
 			&i.Status,
 			&i.Price,
@@ -622,7 +719,8 @@ SELECT
     w.created_at,
     w.updated_at,
     ws.id AS setter_id,
-    ws.krd,
+    ws.ku,
+    ws.en,
     ws.ar
 FROM warehouses w
 LEFT JOIN warehousesetter ws ON w.id = ws.warehouse_id
@@ -639,7 +737,8 @@ type ListWarehousesRow struct {
 	CreatedAt   pgtype.Timestamp
 	UpdatedAt   pgtype.Timestamp
 	SetterID    pgtype.Int4
-	Krd         pgtype.Text
+	Ku          pgtype.Text
+	En          pgtype.Text
 	Ar          pgtype.Text
 }
 
@@ -662,7 +761,8 @@ func (q *Queries) ListWarehouses(ctx context.Context) ([]ListWarehousesRow, erro
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.SetterID,
-			&i.Krd,
+			&i.Ku,
+			&i.En,
 			&i.Ar,
 		); err != nil {
 			return nil, err
@@ -711,18 +811,26 @@ func (q *Queries) UpdateWarehouseInfo(ctx context.Context, arg UpdateWarehouseIn
 const updateWarehouseSetter = `-- name: UpdateWarehouseSetter :exec
 UPDATE warehousesetter
 SET
-  krd = $1,
-  ar = $2
-WHERE warehouse_id = $3
+  ku = $1,
+  en = $2,
+
+  ar = $3
+WHERE warehouse_id = $4
 `
 
 type UpdateWarehouseSetterParams struct {
-	Krd         string
+	Ku          string
+	En          string
 	Ar          string
 	WarehouseID int32
 }
 
 func (q *Queries) UpdateWarehouseSetter(ctx context.Context, arg UpdateWarehouseSetterParams) error {
-	_, err := q.db.Exec(ctx, updateWarehouseSetter, arg.Krd, arg.Ar, arg.WarehouseID)
+	_, err := q.db.Exec(ctx, updateWarehouseSetter,
+		arg.Ku,
+		arg.En,
+		arg.Ar,
+		arg.WarehouseID,
+	)
 	return err
 }

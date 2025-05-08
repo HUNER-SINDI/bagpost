@@ -21,8 +21,9 @@ CREATE TABLE warehouses (
 
 CREATE TABLE warehousesetter (
     id SERIAL PRIMARY KEY,
-    krd VARCHAR(100) NOT NULL,
+    ku VARCHAR(100) NOT NULL,
     ar VARCHAR(100) NOT NULL,
+    en VARCHAR(100) NOT NULL,
     warehouse_id INTEGER NOT NULL UNIQUE,
     FOREIGN KEY (warehouse_id) REFERENCES warehouses(id) ON DELETE CASCADE
 );
@@ -36,7 +37,9 @@ CREATE TABLE store_owners (
     phone VARCHAR(20),
     email VARCHAR(255) UNIQUE,
     password TEXT,
-    location_city VARCHAR(100),
+    city_ku VARCHAR(100),
+    city_en VARCHAR(100),
+    city_ar VARCHAR(100),
     location_address TEXT,
     warehouse_id INTEGER REFERENCES warehouses(id),
     is_active BOOLEAN DEFAULT TRUE,
@@ -59,8 +62,9 @@ CREATE TABLE store_balances (
 
 CREATE TABLE storesetter (
     id SERIAL PRIMARY KEY,
-    krd VARCHAR(100) NOT NULL,
-    ar VARCHAR(100) NOT NULL
+    ku VARCHAR(100) NOT NULL,
+    ar VARCHAR(100) NOT NULL,
+    en VARCHAR(100) NOT NULL
 );
 
 
@@ -103,24 +107,38 @@ CREATE TABLE deliveries (
     barcode VARCHAR(100) NOT NULL UNIQUE,
     store_owner_id INTEGER NOT NULL REFERENCES store_owners(id),
     customer_phone VARCHAR(20) NOT NULL,
-    note VARCHAR(255),  -- Nullable
-    from_city VARCHAR(100) NOT NULL,
-    to_city VARCHAR(100) NOT NULL,
-    to_subcity VARCHAR(100) NOT NULL,
-    to_specific_location VARCHAR(255),  -- Nullable
+    note VARCHAR(255),
+
+    from_city_ku VARCHAR(100) NOT NULL,
+    from_city_en VARCHAR(100) NOT NULL,
+    from_city_ar VARCHAR(100) NOT NULL,
+
+    to_city_ku VARCHAR(100) NOT NULL,
+    to_city_en VARCHAR(100) NOT NULL,
+    to_city_ar VARCHAR(100) NOT NULL,
+
+    to_subcity_ku VARCHAR(100) NOT NULL,
+    to_subcity_en VARCHAR(100) NOT NULL,
+    to_subcity_ar VARCHAR(100) NOT NULL,
+
+    to_specific_location VARCHAR(255),
+
     status VARCHAR(50) NOT NULL,
     price INTEGER NOT NULL,
     fdelivery_fee INTEGER NOT NULL,
     total_price INTEGER NOT NULL,
+
     warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
     created_at TIMESTAMP DEFAULT now() NOT NULL
 );
 
 
+
 CREATE TABLE delivery_routing (
     id SERIAL PRIMARY KEY,
     delivery_id INTEGER NOT NULL REFERENCES deliveries(id) ON DELETE CASCADE,
-    setter_krd VARCHAR(100) NOT NULL,
+    setter_ku VARCHAR(100) NOT NULL,
+    setter_en VARCHAR(100) NOT NULL,
     setter_ar VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT now()
 );
