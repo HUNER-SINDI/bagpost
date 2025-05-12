@@ -53,6 +53,15 @@ type Delivery struct {
 	CreatedAt          pgtype.Timestamp
 }
 
+type DeliveryActionsEmployee struct {
+	ID         int32
+	DeliveryID int32
+	EmployeeID int32
+	Price      int32
+	IsDone     pgtype.Bool
+	CreatedAt  pgtype.Timestamp
+}
+
 type DeliveryRouting struct {
 	ID         int32
 	DeliveryID int32
@@ -84,6 +93,24 @@ type Driver struct {
 	LocationCity    pgtype.Text
 	LocationAddress pgtype.Text
 	SetterLocation  pgtype.Text
+	WarehouseID     pgtype.Int4
+	IsActive        pgtype.Bool
+	CreatedAt       pgtype.Timestamp
+	UpdatedAt       pgtype.Timestamp
+}
+
+type Empl struct {
+	ID              int32
+	FirstName       pgtype.Text
+	LastName        pgtype.Text
+	Phone           pgtype.Text
+	Email           pgtype.Text
+	Password        pgtype.Text
+	LocationAddress pgtype.Text
+	SetterKu        pgtype.Text
+	SetterAr        pgtype.Text
+	SetterEn        pgtype.Text
+	Balance         pgtype.Int4
 	WarehouseID     pgtype.Int4
 	IsActive        pgtype.Bool
 	CreatedAt       pgtype.Timestamp

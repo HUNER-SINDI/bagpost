@@ -67,6 +67,24 @@ CREATE TABLE storesetter (
     en VARCHAR(100) NOT NULL
 );
 
+CREATE TABLE empl (
+    id SERIAL PRIMARY KEY,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    phone VARCHAR(20),
+    email VARCHAR(255) UNIQUE,
+    password TEXT,
+    location_address TEXT,
+    setter_ku VARCHAR(255),
+    setter_ar VARCHAR(255),
+    setter_en VARCHAR(255),
+    balance INTEGER DEFAULT 0,
+    warehouse_id INTEGER REFERENCES warehouses(id),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now()
+);
+
 
 CREATE TABLE drivers (
     id SERIAL PRIMARY KEY,
@@ -149,7 +167,7 @@ CREATE TABLE delivery_transfers (
     origin_warehouse_id INTEGER REFERENCES warehouses(id) NOT NULL,
     current_warehouse_id INTEGER REFERENCES warehouses(id) NOT NULL,
     transfer_status VARCHAR(50) NOT NULL,
-    driver_id INTEGER REFERENCES drivers(id) NULL,
+    driver_id INTEGER NULL,
     transferred_at TIMESTAMP DEFAULT now(),
     received_at TIMESTAMP NULL,
     transfer_note TEXT
@@ -160,4 +178,14 @@ CREATE TABLE delivery_transfers (
 CREATE TABLE ads (
     id SERIAL PRIMARY KEY,
     url VARCHAR(255)
+);
+
+
+CREATE TABLE delivery_actions_employee (
+    id SERIAL PRIMARY KEY,
+    delivery_id INTEGER NOT NULL REFERENCES deliveries(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL REFERENCES empl(id) ON DELETE CASCADE,
+    price INTEGER NOT NULL,
+    is_done BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT now()
 );

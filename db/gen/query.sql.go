@@ -39,6 +39,37 @@ func (q *Queries) CountDeliveriesById(ctx context.Context, storeOwnerID int32) (
 	return count, err
 }
 
+const createDeliveryActionEmployee = `-- name: CreateDeliveryActionEmployee :one
+INSERT INTO delivery_actions_employee (
+    delivery_id,
+    employee_id,
+    price
+) VALUES (
+    $1, $2, $3
+)
+RETURNING id, delivery_id, employee_id, price, is_done, created_at
+`
+
+type CreateDeliveryActionEmployeeParams struct {
+	DeliveryID int32
+	EmployeeID int32
+	Price      int32
+}
+
+func (q *Queries) CreateDeliveryActionEmployee(ctx context.Context, arg CreateDeliveryActionEmployeeParams) (DeliveryActionsEmployee, error) {
+	row := q.db.QueryRow(ctx, createDeliveryActionEmployee, arg.DeliveryID, arg.EmployeeID, arg.Price)
+	var i DeliveryActionsEmployee
+	err := row.Scan(
+		&i.ID,
+		&i.DeliveryID,
+		&i.EmployeeID,
+		&i.Price,
+		&i.IsDone,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const deactivateStoreAccountById = `-- name: DeactivateStoreAccountById :exec
 UPDATE store_owners
 SET is_active = false
@@ -186,6 +217,39 @@ func (q *Queries) GetAllStoreBalanceById(ctx context.Context, id int32) (StoreBa
 	return i, err
 }
 
+const getDeliveryByBarcode = `-- name: GetDeliveryByBarcode :one
+SELECT id, barcode, store_owner_id, customer_phone, note, from_city_ku, from_city_en, from_city_ar, to_city_ku, to_city_en, to_city_ar, to_subcity_ku, to_subcity_en, to_subcity_ar, to_specific_location, status, price, fdelivery_fee, total_price, warehouse_id, created_at FROM deliveries WHERE barcode = $1 LIMIT 1
+`
+
+func (q *Queries) GetDeliveryByBarcode(ctx context.Context, barcode string) (Delivery, error) {
+	row := q.db.QueryRow(ctx, getDeliveryByBarcode, barcode)
+	var i Delivery
+	err := row.Scan(
+		&i.ID,
+		&i.Barcode,
+		&i.StoreOwnerID,
+		&i.CustomerPhone,
+		&i.Note,
+		&i.FromCityKu,
+		&i.FromCityEn,
+		&i.FromCityAr,
+		&i.ToCityKu,
+		&i.ToCityEn,
+		&i.ToCityAr,
+		&i.ToSubcityKu,
+		&i.ToSubcityEn,
+		&i.ToSubcityAr,
+		&i.ToSpecificLocation,
+		&i.Status,
+		&i.Price,
+		&i.FdeliveryFee,
+		&i.TotalPrice,
+		&i.WarehouseID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getDeliveryRoutes = `-- name: GetDeliveryRoutes :many
 SELECT id, delivery_id, setter_ku, setter_en, setter_ar, created_at FROM delivery_routing WHERE delivery_id = $1 ORDER BY created_at ASC
 `
@@ -247,6 +311,184 @@ func (q *Queries) GetDeliveryStatusByStoreId(ctx context.Context, storeOwnerID i
 		return nil, err
 	}
 	return items, nil
+}
+
+const getDeliverySummaryByEmployee = `-- name: GetDeliverySummaryByEmployee :one
+WITH counts_and_sums AS (
+    SELECT 
+        COUNT(*) AS count_is_done_false,
+        SUM(price) AS sum_price_is_done_false
+    FROM 
+        delivery_actions_employee 
+    WHERE 
+        is_done = false
+        AND employee_id = $1  -- Parameterized employee_id
+),
+delivery_sums AS (
+    SELECT 
+        SUM(d.price) AS total_delivery_price,
+        SUM(d.total_price) AS total_price,
+        SUM(d.fdelivery_fee) AS total_fee
+    FROM 
+        delivery_actions_employee dea
+    JOIN 
+        deliveries d ON dea.delivery_id = d.id
+    WHERE 
+        dea.is_done = false
+        AND dea.employee_id = $1  -- Parameterized employee_id
+)
+SELECT 
+    cas.count_is_done_false,
+    cas.sum_price_is_done_false,
+    ds.total_delivery_price,
+    ds.total_price,
+    ds.total_fee,
+    e.balance,
+    e.setter_ku,
+    e.setter_en,
+    e.setter_ar
+FROM 
+    counts_and_sums cas,
+    delivery_sums ds
+JOIN
+    empl e ON e.id = $1
+`
+
+type GetDeliverySummaryByEmployeeRow struct {
+	CountIsDoneFalse    int64
+	SumPriceIsDoneFalse int64
+	TotalDeliveryPrice  int64
+	TotalPrice          int64
+	TotalFee            int64
+	Balance             pgtype.Int4
+	SetterKu            pgtype.Text
+	SetterEn            pgtype.Text
+	SetterAr            pgtype.Text
+}
+
+func (q *Queries) GetDeliverySummaryByEmployee(ctx context.Context, id int32) (GetDeliverySummaryByEmployeeRow, error) {
+	row := q.db.QueryRow(ctx, getDeliverySummaryByEmployee, id)
+	var i GetDeliverySummaryByEmployeeRow
+	err := row.Scan(
+		&i.CountIsDoneFalse,
+		&i.SumPriceIsDoneFalse,
+		&i.TotalDeliveryPrice,
+		&i.TotalPrice,
+		&i.TotalFee,
+		&i.Balance,
+		&i.SetterKu,
+		&i.SetterEn,
+		&i.SetterAr,
+	)
+	return i, err
+}
+
+const getDeliveryTransferByDeliveryID = `-- name: GetDeliveryTransferByDeliveryID :one
+SELECT id, delivery_id, origin_warehouse_id, current_warehouse_id, transfer_status, driver_id, transferred_at, received_at, transfer_note FROM delivery_transfers WHERE delivery_id = $1
+`
+
+func (q *Queries) GetDeliveryTransferByDeliveryID(ctx context.Context, deliveryID int32) (DeliveryTransfer, error) {
+	row := q.db.QueryRow(ctx, getDeliveryTransferByDeliveryID, deliveryID)
+	var i DeliveryTransfer
+	err := row.Scan(
+		&i.ID,
+		&i.DeliveryID,
+		&i.OriginWarehouseID,
+		&i.CurrentWarehouseID,
+		&i.TransferStatus,
+		&i.DriverID,
+		&i.TransferredAt,
+		&i.ReceivedAt,
+		&i.TransferNote,
+	)
+	return i, err
+}
+
+const getDeliveryTransferDetailsWithEmployeePrice = `-- name: GetDeliveryTransferDetailsWithEmployeePrice :many
+SELECT
+  d.barcode,
+  d.price AS delivery_price,
+  d.fdelivery_fee,
+  d.total_price,
+  d.customer_phone,
+  so.phone AS store_owner_phone,
+  so.first_name AS store_owner_first_name,
+  so.last_name AS store_owner_last_name,
+  dae.price AS employee_price
+FROM delivery_actions_employee dae
+JOIN deliveries d ON dae.delivery_id = d.id
+JOIN store_owners so ON d.store_owner_id = so.id
+WHERE dae.is_done = false
+  AND dae.employee_id = $1
+`
+
+type GetDeliveryTransferDetailsWithEmployeePriceRow struct {
+	Barcode             string
+	DeliveryPrice       int32
+	FdeliveryFee        int32
+	TotalPrice          int32
+	CustomerPhone       string
+	StoreOwnerPhone     pgtype.Text
+	StoreOwnerFirstName pgtype.Text
+	StoreOwnerLastName  pgtype.Text
+	EmployeePrice       int32
+}
+
+func (q *Queries) GetDeliveryTransferDetailsWithEmployeePrice(ctx context.Context, employeeID int32) ([]GetDeliveryTransferDetailsWithEmployeePriceRow, error) {
+	rows, err := q.db.Query(ctx, getDeliveryTransferDetailsWithEmployeePrice, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetDeliveryTransferDetailsWithEmployeePriceRow
+	for rows.Next() {
+		var i GetDeliveryTransferDetailsWithEmployeePriceRow
+		if err := rows.Scan(
+			&i.Barcode,
+			&i.DeliveryPrice,
+			&i.FdeliveryFee,
+			&i.TotalPrice,
+			&i.CustomerPhone,
+			&i.StoreOwnerPhone,
+			&i.StoreOwnerFirstName,
+			&i.StoreOwnerLastName,
+			&i.EmployeePrice,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEmplById = `-- name: GetEmplById :one
+SELECT id, first_name, last_name, phone, email, password, location_address, setter_ku, setter_ar, setter_en, balance, warehouse_id, is_active, created_at, updated_at FROM empl WHERE id = $1
+`
+
+func (q *Queries) GetEmplById(ctx context.Context, id int32) (Empl, error) {
+	row := q.db.QueryRow(ctx, getEmplById, id)
+	var i Empl
+	err := row.Scan(
+		&i.ID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Phone,
+		&i.Email,
+		&i.Password,
+		&i.LocationAddress,
+		&i.SetterKu,
+		&i.SetterAr,
+		&i.SetterEn,
+		&i.Balance,
+		&i.WarehouseID,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getFromCityByStoreId = `-- name: GetFromCityByStoreId :one
@@ -773,6 +1015,86 @@ func (q *Queries) ListWarehouses(ctx context.Context) ([]ListWarehousesRow, erro
 		return nil, err
 	}
 	return items, nil
+}
+
+const loginEmplWithEmailAndPassword = `-- name: LoginEmplWithEmailAndPassword :one
+SELECT id, first_name, last_name, phone, email, password, location_address, setter_ku, setter_ar, setter_en, balance, warehouse_id, is_active, created_at, updated_at FROM empl
+WHERE email = $1 AND password = $2
+LIMIT 1
+`
+
+type LoginEmplWithEmailAndPasswordParams struct {
+	Email    pgtype.Text
+	Password pgtype.Text
+}
+
+func (q *Queries) LoginEmplWithEmailAndPassword(ctx context.Context, arg LoginEmplWithEmailAndPasswordParams) (Empl, error) {
+	row := q.db.QueryRow(ctx, loginEmplWithEmailAndPassword, arg.Email, arg.Password)
+	var i Empl
+	err := row.Scan(
+		&i.ID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Phone,
+		&i.Email,
+		&i.Password,
+		&i.LocationAddress,
+		&i.SetterKu,
+		&i.SetterAr,
+		&i.SetterEn,
+		&i.Balance,
+		&i.WarehouseID,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateDeliveryStatusToPending = `-- name: UpdateDeliveryStatusToPending :exec
+UPDATE deliveries
+SET status = 'pending'
+WHERE id = $1
+`
+
+func (q *Queries) UpdateDeliveryStatusToPending(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, updateDeliveryStatusToPending, id)
+	return err
+}
+
+const updateDriverForDelivery = `-- name: UpdateDriverForDelivery :exec
+UPDATE delivery_transfers
+SET driver_id = $1
+WHERE delivery_id = $2
+`
+
+type UpdateDriverForDeliveryParams struct {
+	DriverID   pgtype.Int4
+	DeliveryID int32
+}
+
+func (q *Queries) UpdateDriverForDelivery(ctx context.Context, arg UpdateDriverForDeliveryParams) error {
+	_, err := q.db.Exec(ctx, updateDriverForDelivery, arg.DriverID, arg.DeliveryID)
+	return err
+}
+
+const updateStoreBalanceOnTransfer = `-- name: UpdateStoreBalanceOnTransfer :exec
+UPDATE store_balances
+SET
+    in_store_balance = in_store_balance - $1,
+    pending_balance = pending_balance + $1,
+    updated_at = now()
+WHERE store_owner_id = $2
+`
+
+type UpdateStoreBalanceOnTransferParams struct {
+	InStoreBalance pgtype.Int4
+	StoreOwnerID   pgtype.Int4
+}
+
+func (q *Queries) UpdateStoreBalanceOnTransfer(ctx context.Context, arg UpdateStoreBalanceOnTransferParams) error {
+	_, err := q.db.Exec(ctx, updateStoreBalanceOnTransfer, arg.InStoreBalance, arg.StoreOwnerID)
+	return err
 }
 
 const updateWarehouseInfo = `-- name: UpdateWarehouseInfo :exec

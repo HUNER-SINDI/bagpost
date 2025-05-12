@@ -233,5 +233,101 @@ SELECT city_ku , city_en , city_ar FROM store_owners WHERE id = $1;
 -- name: GetAllStoreBalanceById :one
 SELECT * FROM store_balances WHERE id = $1;
 
+-- name: LoginEmplWithEmailAndPassword :one
+SELECT * FROM empl
+WHERE email = $1 AND password = $2
+LIMIT 1;
 
+-- name: GetEmplById :one
+SELECT * FROM empl WHERE id = $1;
 
+-- name: GetDeliveryByBarcode :one
+SELECT * FROM deliveries WHERE barcode = $1 LIMIT 1;
+
+-- name: UpdateDriverForDelivery :exec
+UPDATE delivery_transfers
+SET driver_id = $1
+WHERE delivery_id = $2;
+
+-- name: UpdateStoreBalanceOnTransfer :exec
+UPDATE store_balances
+SET
+    in_store_balance = in_store_balance - $1,
+    pending_balance = pending_balance + $1,
+    updated_at = now()
+WHERE store_owner_id = $2;
+
+-- name: CreateDeliveryActionEmployee :one
+INSERT INTO delivery_actions_employee (
+    delivery_id,
+    employee_id,
+    price
+) VALUES (
+    $1, $2, $3
+)
+RETURNING *;
+
+-- name: UpdateDeliveryStatusToPending :exec
+UPDATE deliveries
+SET status = 'pending'
+WHERE id = $1;
+
+-- name: GetDeliveryTransferByDeliveryID :one
+SELECT * FROM delivery_transfers WHERE delivery_id = $1;
+
+-- name: GetDeliveryTransferDetailsWithEmployeePrice :many
+SELECT
+  d.barcode,
+  d.price AS delivery_price,
+  d.fdelivery_fee,
+  d.total_price,
+  d.customer_phone,
+  so.phone AS store_owner_phone,
+  so.first_name AS store_owner_first_name,
+  so.last_name AS store_owner_last_name,
+  dae.price AS employee_price
+FROM delivery_actions_employee dae
+JOIN deliveries d ON dae.delivery_id = d.id
+JOIN store_owners so ON d.store_owner_id = so.id
+WHERE dae.is_done = false
+  AND dae.employee_id = $1;
+
+-- name: GetDeliverySummaryByEmployee :one
+WITH counts_and_sums AS (
+    SELECT 
+        COUNT(*) AS count_is_done_false,
+        SUM(price) AS sum_price_is_done_false
+    FROM 
+        delivery_actions_employee 
+    WHERE 
+        is_done = false
+        AND employee_id = $1  -- Parameterized employee_id
+),
+delivery_sums AS (
+    SELECT 
+        SUM(d.price) AS total_delivery_price,
+        SUM(d.total_price) AS total_price,
+        SUM(d.fdelivery_fee) AS total_fee
+    FROM 
+        delivery_actions_employee dea
+    JOIN 
+        deliveries d ON dea.delivery_id = d.id
+    WHERE 
+        dea.is_done = false
+        AND dea.employee_id = $1  -- Parameterized employee_id
+)
+SELECT 
+    cas.count_is_done_false,
+    cas.sum_price_is_done_false,
+    ds.total_delivery_price,
+    ds.total_price,
+    ds.total_fee,
+    e.balance,
+    e.setter_ku,
+    e.setter_en,
+    e.setter_ar
+FROM 
+    counts_and_sums cas,
+    delivery_sums ds
+JOIN
+    empl e ON e.id = $1;  -- Parameterized employee_id
